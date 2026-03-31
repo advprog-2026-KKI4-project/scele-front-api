@@ -17,6 +17,7 @@ struct AnnouncementResponse {
 
 struct ServerState {
     pub request_count: Mutex<u8>,
+    pub cache: Mutex<Option<Vec<AnnouncementResponse>>>,
 }
 
 fn parse_frontpage(page: Html) -> Vec<AnnouncementResponse> {
@@ -52,8 +53,6 @@ fn parse_frontpage(page: Html) -> Vec<AnnouncementResponse> {
 
 #[get("/announcements")]
 async fn get_all_announcements(data: web::Data<ServerState>) -> Result<impl Responder> {
-    let page = get_frontpage("https://scele.cs.ui.ac.id").unwrap();
-    let announcements = parse_frontpage(page);
 
     {
         let mut request_count = data.request_count.lock().unwrap();
@@ -63,6 +62,22 @@ async fn get_all_announcements(data: web::Data<ServerState>) -> Result<impl Resp
         println!("Request count: {}", *request_count);
         }
 
+    {
+        let cache_guard = data.cache.lock().unwrap();
+        if let Some(cached_announcements) = &*cache_guard {
+        println!("Served from Cache!");
+        return Ok(web::Json(cached_announcements.clone()));
+        }
+        }
+
+    let page = get_frontpage("https://scele.cs.ui.ac.id").unwrap();
+    let announcements = parse_frontpage(page);
+
+    {
+        let mut cache_guard = data.cache.lock().unwrap();
+        *cache_guard = Some(announcements.clone());
+        }
+
     Ok(web::Json(announcements))
 }
 
@@ -70,6 +85,8 @@ async fn get_all_announcements(data: web::Data<ServerState>) -> Result<impl Resp
 async fn main() -> std::io::Result<()> {
 let state = web::Data::new(ServerState {
         request_count: Mutex::new(0),
+        cache: Mutex::new(None),
+
     });
 
     use actix_web::{App, HttpServer};
