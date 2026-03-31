@@ -16,10 +16,8 @@ struct AnnouncementResponse {
 }
 
 struct ServerState {
-    pub request_count: UnsafeCell<u8>,
+    pub request_count: Mutex<u8>,
 }
-
-unsafe impl Sync for ServerState {}
 
 fn parse_frontpage(page: Html) -> Vec<AnnouncementResponse> {
     let selector = Selector::parse("article").unwrap();
@@ -57,16 +55,13 @@ async fn get_all_announcements(data: web::Data<ServerState>) -> Result<impl Resp
     let page = get_frontpage("https://scele.cs.ui.ac.id").unwrap();
     let announcements = parse_frontpage(page);
 
-    // Deliberately unsafe, because Rust is too safe for our demo :))
-    unsafe {
-        let request_count_ptr = data.request_count.get();
-        let val = *request_count_ptr;
-        let delay_ms = rand::thread_rng().gen_range(0..1000_u64); // This is to simulate interleaving execution in the thread
+    {
+        let mut request_count = data.request_count.lock().unwrap();
+        let delay_ms = rand::thread_rng().gen_range(0..1000_u64);
         thread::sleep(Duration::from_millis(delay_ms));
-        *request_count_ptr = val + 1;
-    }
-    
-    println!("Request count: {}", unsafe { *data.request_count.get() });
+        *request_count += 1;
+        println!("Request count: {}", *request_count);
+        }
 
     Ok(web::Json(announcements))
 }
