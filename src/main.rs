@@ -1,4 +1,4 @@
-use std::{cell::UnsafeCell, sync::Mutex, thread, time::Duration};
+use std::{sync::Mutex, thread, time::Duration};
 
 use actix_web::{Responder, Result, get, web};
 use chrono::{DateTime, Utc};
@@ -68,8 +68,8 @@ async fn get_all_announcements(data: web::Data<ServerState>) -> Result<impl Resp
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    let state = web::Data::new(ServerState {
-        request_count: UnsafeCell::new(0),
+let state = web::Data::new(ServerState {
+        request_count: Mutex::new(0),
     });
 
     use actix_web::{App, HttpServer};
